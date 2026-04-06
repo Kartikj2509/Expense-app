@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <title>Expense Tracker Pro</title>
+    
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Expense Tracker Pro","short_name":"ExpensePro","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/3135/3135715.png","sizes":"512x512","type":"image/png"}]}'>
+    <meta name="theme-color" content="#0f172a">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --bg-color: #0f172a; --text-color: #f1f5f9; --card-bg: rgba(255, 255, 255, 0.03); --card-border: rgba(255, 255, 255, 0.1); }
+        body.warm-theme { --bg-color: #fdf6e3; --text-color: #334155; --card-bg: rgba(0, 0, 0, 0.04); --card-border: rgba(0, 0, 0, 0.1); }
+        body.latte-theme { --bg-color: #f5ebe0; --text-color: #4a3f35; --card-bg: rgba(74, 63, 53, 0.06); --card-border: rgba(74, 63, 53, 0.15); }
+        
+        body { font-family: 'Plus Jakarta Sans', sans-serif; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.5s ease, color 0.5s ease; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 0px; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .glass-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--card-border); }
+        #screenWrapper { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); height: 100%; }
+        section { height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+        .badge { filter: grayscale(100%); opacity: 0.4; transition: all 0.5s; }
+        .badge.unlocked { filter: grayscale(0%); opacity: 1; transform: scale(1.1); }
+        
+        #sheetOverlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 90; }
+        #sheetOverlay.active { opacity: 1; pointer-events: all; }
+        #addSheet { transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; border-top: 1px solid var(--card-border); border-top-left-radius: 2.5rem; border-top-right-radius: 2.5rem; }
+        #addSheet.active { transform: translateY(0); }
+        .chip { background: var(--card-bg); border: 1px solid var(--card-border); padding: 6px 12px; border-radius: 99px; font-size: 11px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+        .chip:active { background: rgba(59, 130, 246, 0.5); }
+        
+        /* Dropdown fix */
+        input, select { color: var(--text-color); }
+        option { background-color: var(--bg-color); color: var(--text-color); }
+
+        /* Toggle Switch CSS */
+        .toggle-checkbox:checked { right: 0; border-color: #2563eb; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #2563eb; }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+
+<div class="max-w-md w-full h-[90vh] flex flex-col relative overflow-hidden shadow-2xl rounded-[3rem] border border-white/10" style="background-color: var(--bg-color);">
+
+    <header class="p-6 pb-2 flex justify-between items-center z-50 backdrop-blur-md">
+        <div>
+            <p id="greeting" class="text-2xl font-bold">Hey Bunny 👋</p>
+            <input type="month" id="monthSelector" onchange="changeMonth()" class="bg-transparent text-[12px] uppercase tracking-widest text-blue-500 font-bold outline-none cursor-pointer mt-1 border-none appearance-none">
+        </div>
+        <div class="flex gap-3 items-center">
+            <button onclick="toggleTheme()" class="opacity-50 hover:opacity-100 text-2xl transition-all" id="themeBtn">🌗</button>
+        </div>
+    </header>
+
+    <div class="flex-1 overflow-hidden relative">
+        <div id="screenWrapper" class="flex w-full h-full">
+
+            <section id="homeScreen" class="min-w-full p-6 space-y-6 pb-32">
+                <div id="mainBalanceCard" class="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-[2.5rem] shadow-2xl text-white">
+                    <p class="text-blue-100 text-sm opacity-80">Available Wallet (<span id="displayMonthName">This Month</span>)</p>
+                    <h2 class="text-5xl font-extrabold tracking-tight mb-6">₹<span id="balance">0</span></h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white/10 p-3 rounded-2xl text-center">
+                            <p class="text-[9px] uppercase font-bold text-blue-200">Income</p>
+                            <p class="text-sm font-bold">₹<span id="totalIncome">0</span></p>
+                        </div>
+                        <div class="bg-black/10 p-3 rounded-2xl text-center">
+                            <p class="text-[9px] uppercase font-bold text-red-200">My Spending</p>
+                            <p class="text-sm font-bold">₹<span id="totalExpense">0</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-5 rounded-[2rem] border-blue-500/30">
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-[10px] uppercase font-bold text-blue-400">Monthly Goal Progress</p>
+                        <p class="text-xs font-bold">₹<span id="totalLockedTop">0</span> / ₹<span id="displayGoal">0</span></p>
+                    </div>
+                    <div class="w-full bg-black/20 h-2 rounded-full overflow-hidden mb-4">
+                        <div id="goalProgress" class="h-full bg-blue-500 transition-all duration-1000" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-[10px] uppercase opacity-60 font-bold">Leftover Money</p>
+                            <p class="text-xl font-bold" id="leftoverMoney">₹0</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] uppercase opacity-60 font-bold">Safe To Spend</p>
+                            <p class="text-xl font-bold" id="safeToSpend">₹0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="glass-card p-4 rounded-3xl col-span-1 text-center flex flex-col justify-center border-orange-500/30">
+                        <p class="text-2xl mb-1">🔥</p>
+                        <p class="text-xl font-bold" id="streakDays">0</p>
+                        <p class="text-[8px] uppercase opacity-60 font-bold">No-Spend Days</p>
+                    </div>
+                    <div class="glass-card p-4 rounded-3xl col-span-2">
+                        <p class="text-[10px] uppercase font-bold opacity-60 mb-2">Trophy Room</p>
+                        <div class="flex justify-around items-center h-12">
+                            <div id="badgeDistance" class="badge text-3xl" title="Distance Closer: Saved for Travel/Gifts">✈️</div>
+                            <div id="badgeTech" class="badge text-3xl" title="Tech Architect: Funded a Web/Tech project">💻</div>
+                            <div id="badgeFrugal" class="badge text-3xl" title="Frugal Master: 3 Day Streak">🛡️</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-[2rem]">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-sm">Savings Buckets</h3>
+                        <button onclick="createNewBucket()" class="text-xs bg-blue-500/20 text-blue-500 px-2 py-1 rounded font-bold">+ New</button>
+                    </div>
+                    <div id="bucketsContainer" class="space-y-4"></div>
+                </div>
+            </section>
+
+            <section id="partnerScreen" class="min-w-full p-6 space-y-6 pb-32">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-2xl font-bold">Shared Ledger</h2>
+                    <span class="text-3xl">🤝</span>
+                </div>
+
+                <div id="partnerBalanceCard" class="glass-card p-8 rounded-[2.5rem] text-center border-blue-500/30 flex flex-col items-center justify-center">
+                    <p class="text-xs uppercase font-bold opacity-60 mb-2" id="partnerStatusText">Calculating...</p>
+                    <h2 class="text-5xl font-extrabold tracking-tight mb-4" id="partnerBalanceAmount">₹0</h2>
+                    <button id="settleUpBtn" onclick="settleUp()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/30 active:scale-95 transition-all">Settle Up Balance</button>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-4 opacity-70">Shared Transactions</h3>
+                    <ul id="sharedExpenseList" class="space-y-3"></ul>
+                </div>
+            </section>
+
+            <section id="statsScreen" class="min-w-full p-6 space-y-6 pb-32">
+                <div class="glass-card p-5 rounded-[2rem] bg-indigo-900/20 border-indigo-500/30">
+                    <h3 class="text-xs font-bold mb-3 text-indigo-400 uppercase">📊 Predictive Forecasting</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><p class="text-[10px] opacity-60">Avg. Daily Burn</p><p class="text-lg font-bold">₹<span id="burnRate">0</span>/day</p></div>
+                        <div><p class="text-[10px] opacity-60">Runway Left</p><p class="text-lg font-bold"><span id="runwayDays">0</span> Days</p></div>
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-[2rem]">
+                    <h3 class="text-sm font-bold mb-4 opacity-70">Spending Analytics</h3>
+                    <div class="relative w-full aspect-square"><canvas id="expenseChart"></canvas></div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold mb-2">Transaction Database</h3>
+                    <input type="text" id="searchInput" onkeyup="filterDatabase()" placeholder="Search by category or note..." class="w-full p-3 mb-4 rounded-xl bg-black/10 border border-white/10 outline-none text-sm">
+                    <ul id="expenseList" class="space-y-3"></ul>
+                </div>
+            </section>
+
+            <section id="settingsScreen" class="min-w-full p-6 space-y-6 pb-32">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-2xl font-bold">Settings & Tools</h2>
+                    <button onclick="resetData()" class="text-xs bg-red-500/20 px-3 py-2 rounded-lg text-red-500 font-bold">Nuke Data</button>
+                </div>
+
+                <div class="glass-card p-6 rounded-[2.5rem] space-y-3">
+                    <h3 class="text-xs font-bold opacity-50 uppercase">Ledger Setup</h3>
+                    <input id="partnerNameInput" type="text" placeholder="Partner's Name" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 outline-none text-sm">
+                    <button onclick="savePartnerName()" class="w-full p-3 rounded-xl bg-pink-600/20 text-pink-500 font-bold text-sm mb-2">Save Partner Name</button>
+                </div>
+
+                <div class="glass-card p-6 rounded-[2.5rem] space-y-3">
+                    <h3 class="text-xs font-bold opacity-50 uppercase flex justify-between items-center">
+                        Wallet Setup
+                        <div class="flex gap-2">
+                            <button onclick="exportData()" class="text-[10px] bg-blue-500/20 text-blue-500 px-2 py-1 rounded">Export CSV</button>
+                        </div>
+                    </h3>
+                    <input id="incomeInput" type="number" placeholder="Add Income" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 outline-none text-sm">
+                    <button onclick="addIncome()" class="w-full p-3 rounded-xl bg-emerald-600/20 text-emerald-500 font-bold text-sm mb-2">Update Income</button>
+                    
+                    <input id="goalInput" type="number" placeholder="Monthly Saving Goal (₹)" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 outline-none text-sm">
+                    <button onclick="setSavingGoal()" class="w-full p-3 rounded-xl bg-blue-600/20 text-blue-500 font-bold text-sm mb-2">Set Saving Goal</button>
+
+                    <input id="pocketInput" type="number" placeholder="Set Pocket Money" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 outline-none text-sm mt-2">
+                    <button onclick="setPocketMoney()" class="w-full p-3 rounded-xl bg-purple-600/20 text-purple-500 font-bold text-sm">Set Pocket Money</button>
+                </div>
+
+                <div class="glass-card p-6 rounded-[2.5rem] space-y-3">
+                    <h3 class="text-xs font-bold opacity-50 uppercase flex justify-between items-center">
+                        Manage Categories
+                        <button onclick="deleteCategory()" class="text-[10px] bg-red-500/20 text-red-500 px-2 py-1 rounded">Delete</button>
+                    </h3>
+                    <div class="flex gap-2">
+                        <input id="newCategory" type="text" placeholder="New Category" class="flex-1 p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none">
+                        <button onclick="addCategory()" class="px-4 bg-blue-600 text-white rounded-xl font-bold">+</button>
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-[2.5rem] space-y-4 border-indigo-500/30">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-indigo-400 uppercase">🤖 Auto-Pilot Subscriptions</h3>
+                    </div>
+                    <div id="subsList" class="space-y-2 mb-2 text-sm"></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input id="subName" type="text" placeholder="e.g. Netflix" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none">
+                        <input id="subAmount" type="number" placeholder="Amount (₹)" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none">
+                        <select id="subCategory" class="p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none"></select>
+                        <input id="subDate" type="number" placeholder="Day (1-31)" min="1" max="31" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none">
+                    </div>
+                    <button onclick="addSubscription()" class="w-full p-3 rounded-xl bg-indigo-600/20 text-indigo-400 font-bold text-sm hover:bg-indigo-600/40">Add Recurring Bill</button>
+                </div>
+
+                <div class="glass-card p-6 rounded-[2.5rem] space-y-4 border-emerald-500/30">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-emerald-500 uppercase">⚡ EV Split Calculator</h3>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="text-[10px] opacity-60 pl-2">Daily Trip (km)</label><input id="evDistance" type="number" value="15" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none"></div>
+                        <div><label class="text-[10px] opacity-60 pl-2">Days / Month</label><input id="evDays" type="number" value="22" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none"></div>
+                        <div><label class="text-[10px] opacity-60 pl-2">Range (km/unit)</label><input id="evRange" type="number" value="35" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none"></div>
+                        <div><label class="text-[10px] opacity-60 pl-2">Elec. Rate (₹)</label><input id="evRate" type="number" value="8" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none"></div>
+                        <div><label class="text-[10px] opacity-60 pl-2">Extra/Parking (₹)</label><input id="evParking" type="number" value="100" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none"></div>
+                        <div><label class="text-[10px] opacity-60 pl-2">People Sharing</label><input id="evPeople" type="number" value="2" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 text-sm outline-none"></div>
+                    </div>
+                    <button onclick="calculateEV()" class="w-full p-3 rounded-xl bg-emerald-600/20 text-emerald-500 font-bold text-sm">Calculate Cost</button>
+                    <div id="evResultArea" class="hidden bg-black/20 p-4 rounded-2xl border border-white/10 mt-2 text-center">
+                        <p class="text-[10px] opacity-60 uppercase">Your Monthly Share</p>
+                        <p class="text-3xl font-bold text-emerald-500 my-1">₹<span id="evFinalShare">0</span></p>
+                        <button onclick="saveEVExpense()" class="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold w-full">+ Log to Travel</button>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+    </div>
+
+    <div id="sheetOverlay" class="absolute inset-0" onclick="toggleAddSheet(false)"></div>
+
+    <div id="addSheet" class="absolute bottom-0 left-0 right-0 p-6 space-y-4" style="background-color: var(--bg-color);">
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="font-bold text-xl" id="sheetTitle">New Transaction</h3>
+            <button onclick="toggleAddSheet(false)" class="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center border border-white/10">✕</button>
+        </div>
+        
+        <input id="expenseAmount" type="number" placeholder="Total Cost (₹)" class="w-full p-4 rounded-2xl bg-black/10 border border-white/10 outline-none focus:border-blue-500 text-xl font-bold text-center">
+        
+        <div class="grid grid-cols-2 gap-2">
+            <select id="category" class="p-3 rounded-xl bg-black/10 border border-white/10 outline-none text-sm"></select>
+            <input id="expenseDate" type="date" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 outline-none text-sm">
+        </div>
+
+        <div class="w-full min-w-0">
+            <input id="note" type="text" placeholder="Note / Details" class="w-full p-3 rounded-xl bg-black/10 border border-white/10 outline-none text-sm mb-2">
+            <div id="noteChips" class="flex gap-2 overflow-x-auto pb-1 scroll-smooth hide-scroll"></div>
+        </div>
+
+        <div class="glass-card p-4 rounded-2xl border border-white/5 space-y-3">
+            <div class="flex justify-between items-center">
+                <span class="text-sm font-bold">Split with Partner?</span>
+                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="toggle" id="sharedToggle" onchange="toggleSharedOptions()" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300"/>
+                    <label for="sharedToggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-black/30 cursor-pointer transition-all duration-300"></label>
+                </div>
+            </div>
+            
+            <div id="sharedOptionsContainer" class="hidden pt-2 border-t border-white/10">
+                <p class="text-xs opacity-60 mb-2">Who paid for this?</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="paidMeBtn" onclick="setPaidBy('me')" class="p-2 rounded-lg bg-blue-600 text-white font-bold text-sm transition-all border border-blue-500">I Paid</button>
+                    <button id="paidPartnerBtn" onclick="setPaidBy('partner')" class="p-2 rounded-lg bg-black/20 opacity-50 font-bold text-sm transition-all border border-transparent">Partner Paid</button>
+                </div>
+                <p class="text-[10px] opacity-50 mt-2 text-center" id="splitExplainer">You will pay ₹0 and Partner owes you ₹0</p>
+            </div>
+        </div>
+        
+        <button id="saveBtn" onclick="saveTransaction()" class="w-full p-4 rounded-2xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/20 active:scale-95 transition-all mt-2">Save Expense</button>
+    </div>
+
+    <nav class="absolute bottom-6 left-6 right-6 h-20 glass-card rounded-[2rem] flex items-center justify-between px-6 shadow-2xl z-50">
+        <button onclick="switchTab('home')" class="text-2xl filter grayscale hover:grayscale-0 transition-all active:scale-90">🏠</button>
+        <button onclick="switchTab('partner')" class="text-2xl filter grayscale hover:grayscale-0 transition-all active:scale-90">🤝</button>
+        <button onclick="toggleAddSheet(true)" class="w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center text-3xl shadow-xl shadow-blue-500/40 -mt-10 border-4 border-[var(--bg-color)] active:scale-90 transition-all z-10" style="border-color: var(--bg-color);">+</button>
+        <button onclick="switchTab('stats')" class="text-2xl filter grayscale hover:grayscale-0 transition-all active:scale-90">📊</button>
+        <button onclick="switchTab('settings')" class="text-2xl filter grayscale hover:grayscale-0 transition-all active:scale-90">⚙️</button>
+    </nav>
+</div>  
+
+<script>
+// --- INLINE SERVICE WORKER FOR PWA ---
+if ('serviceWorker' in navigator) {
+    const swCode = `
+        self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
+        self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+        self.addEventListener('fetch', e => { e.respondWith(fetch(e.request).catch(() => new Response('Offline mode active'))); });
+    `;
+    const blob = new Blob([swCode], {type: 'application/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(console.error);
+}
+
+// --- DATA INITIALIZATION ---
+let defaultData = {
+    income: 0, monthlySavingGoal: 0, pocketMoney: 0, expenses: [], categories: ["Food", "Travel", "Rent", "Tech", "Other"],
+    buckets: [{id: 1, name: "Project Fund", target: 5000, saved: 0}], subscriptions: [],
+    theme: 'dark', partnerName: "Partner"
+};
+let data = JSON.parse(localStorage.getItem("expenseData")) || defaultData;
+if(!data.partnerName) data.partnerName = "Partner";
+if(!data.subscriptions) data.subscriptions = [];
+if(!data.pocketMoney) data.pocketMoney = 0;
+
+let chartInstance = null;
+let editingExpenseId = null; 
+let currentPaidBy = 'me'; 
+
+// Apply theme & month on load
+document.body.className = `min-h-screen flex items-center justify-center p-4 ${data.theme}-theme`;
+const themeIcons = { 'dark': '🌗', 'warm': '☀️', 'latte': '☕' };
+document.getElementById('themeBtn').innerText = themeIcons[data.theme] || '🌗';
+document.getElementById('monthSelector').value = new Date().toISOString().slice(0, 7);
+document.getElementById('partnerNameInput').value = data.partnerName;
+
+function saveData() { localStorage.setItem("expenseData", JSON.stringify(data)); }
+
+function toggleTheme() {
+    const themes = ['dark', 'warm', 'latte'];
+    data.theme = themes[(themes.indexOf(data.theme) + 1) % themes.length];
+    document.body.className = `min-h-screen flex items-center justify-center p-4 ${data.theme}-theme`;
+    document.getElementById('themeBtn').innerText = themeIcons[data.theme];
+    saveData(); renderChart(); 
+}
+
+function changeMonth() { updateUI(); }
+function getActiveMonth() { return document.getElementById('monthSelector').value; }
+function getFilteredExpenses() { return data.expenses.filter(e => e.date.startsWith(getActiveMonth())); }
+
+function switchTab(tab) {
+    const map = {home: 0, partner: 1, stats: 2, settings: 3};
+    document.getElementById("screenWrapper").style.transform = `translateX(-${map[tab] * 100}%)`;
+    if(tab === 'stats') renderChart(); 
+}
+
+// --- CORE MATH ---
+function getWalletImpact(e) {
+    if(e.isSettlement) return e.paidBy === 'me' ? e.amount : -e.amount;
+    if(e.shared) return e.paidBy === 'me' ? e.amount : 0;
+    return e.amount; 
+}
+function getMyExpenseShare(e) {
+    if(e.isSettlement) return 0;
+    if(e.shared) return e.amount / 2;
+    return e.amount;
+}
+function getPartnerBalanceImpact(e) {
+    if(e.isSettlement) return e.paidBy === 'me' ? e.amount : -e.amount; 
+    if(e.shared) return e.paidBy === 'me' ? (e.amount / 2) : -(e.amount / 2);
+    return 0;
+}
+
+function getTotalExpenses() { return getFilteredExpenses().reduce((sum, e) => sum + getMyExpenseShare(e), 0); }
+function getTotalSaved() { return data.buckets.reduce((sum, b) => sum + b.saved, 0); }
+function getWalletDeductions() { return getFilteredExpenses().reduce((sum, e) => sum + getWalletImpact(e), 0); }
+function getBalance() { return data.income - getWalletDeductions() - getTotalSaved(); }
+function calculateOverallPartnerBalance() { return data.expenses.reduce((sum, e) => sum + getPartnerBalanceImpact(e), 0); }
+
+// --- ADD / EDIT SHEET ---
+function toggleSharedOptions() {
+    const isShared = document.getElementById('sharedToggle').checked;
+    document.getElementById('sharedOptionsContainer').classList.toggle('hidden', !isShared);
+    updateSplitExplainer();
+}
+
+function setPaidBy(person) {
+    currentPaidBy = person;
+    let meBtn = document.getElementById('paidMeBtn'); let pBtn = document.getElementById('paidPartnerBtn');
+    pBtn.innerText = `${data.partnerName} Paid`;
+    if(person === 'me') {
+        meBtn.className = "p-2 rounded-lg bg-blue-600 text-white font-bold text-sm transition-all border border-blue-500";
+        pBtn.className = "p-2 rounded-lg bg-black/20 opacity-50 font-bold text-sm transition-all border border-transparent";
+    } else {
+        meBtn.className = "p-2 rounded-lg bg-black/20 opacity-50 font-bold text-sm transition-all border border-transparent";
+        pBtn.className = "p-2 rounded-lg bg-blue-600 text-white font-bold text-sm transition-all border border-blue-500";
+    }
+    updateSplitExplainer();
+}
+
+function updateSplitExplainer() {
+    let amt = Number(document.getElementById('expenseAmount').value) || 0; let half = amt / 2;
+    let isShared = document.getElementById('sharedToggle').checked; let explainer = document.getElementById('splitExplainer');
+    if(!isShared) { explainer.innerText = ""; return; }
+    if(currentPaidBy === 'me') { explainer.innerText = `You spend ₹${half}. ${data.partnerName} owes you ₹${half}.`; explainer.className = "text-[10px] mt-2 text-center text-emerald-500 font-bold"; } 
+    else { explainer.innerText = `You owe ${data.partnerName} ₹${half}.`; explainer.className = "text-[10px] mt-2 text-center text-red-500 font-bold"; }
+}
+document.getElementById('expenseAmount').addEventListener('input', updateSplitExplainer);
+
+function toggleAddSheet(show, editId = null) {
+    const sheet = document.getElementById('addSheet'); const overlay = document.getElementById('sheetOverlay');
+    document.getElementById('paidPartnerBtn').innerText = `${data.partnerName} Paid`;
+    
+    if (show) {
+        sheet.classList.add('active'); overlay.classList.add('active'); renderNoteChips(); 
+        if (editId) {
+            editingExpenseId = editId; let exp = data.expenses.find(e => e.id === editId);
+            document.getElementById('sheetTitle').innerText = "Edit Transaction";
+            document.getElementById('saveBtn').innerText = "Update Expense";
+            document.getElementById('expenseAmount').value = exp.amount; 
+            document.getElementById('category').value = exp.category;
+            document.getElementById('expenseDate').value = exp.date;
+            document.getElementById('note').value = exp.note;
+            document.getElementById('sharedToggle').checked = exp.shared || false;
+            setPaidBy(exp.paidBy || 'me'); toggleSharedOptions();
+        } else {
+            editingExpenseId = null;
+            document.getElementById('sheetTitle').innerText = "New Transaction"; document.getElementById('saveBtn').innerText = "Save Expense";
+            document.getElementById('expenseAmount').value = ""; document.getElementById('note').value = "";
+            document.getElementById('expenseDate').valueAsDate = new Date(); 
+            document.getElementById('sharedToggle').checked = false;
+            setPaidBy('me'); toggleSharedOptions();
+        }
+    } else {
+        sheet.classList.remove('active'); overlay.classList.remove('active'); editingExpenseId = null;
+    }
+}
+
+function renderNoteChips() {
+    let notes = data.expenses.map(e => e.note).filter(n => n && n.trim() !== "");
+    let counts = {}; notes.forEach(n => counts[n] = (counts[n] || 0) + 1);
+    let topNotes = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 5);
+    let container = document.getElementById("noteChips");
+    if (topNotes.length === 0) { container.innerHTML = `<span class="chip opacity-50">No recent notes</span>`; return; }
+    container.innerHTML = topNotes.map(n => `<span class="chip" onclick="document.getElementById('note').value='${n}'">${n}</span>`).join('');
+}
+
+function saveTransaction() {
+    let amount = Number(document.getElementById("expenseAmount").value);
+    let category = document.getElementById("category").value; let note = document.getElementById("note").value;
+    let customDate = document.getElementById("expenseDate").value; let shared = document.getElementById("sharedToggle").checked;
+    
+    if(amount <= 0) return showToast("Invalid amount!", true);
+    let targetDate = customDate ? new Date(customDate) : new Date();
+
+    let expenseObj = { 
+        id: editingExpenseId || Date.now(), amount: amount, category: category, note: note, shared: shared, 
+        paidBy: shared ? currentPaidBy : 'me', isSettlement: false,
+        date: targetDate.toISOString().split("T")[0], time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+    };
+
+    if (editingExpenseId) { data.expenses = data.expenses.map(e => e.id === editingExpenseId ? expenseObj : e); showToast("Transaction Updated! ✏️"); } 
+    else { data.expenses.push(expenseObj); showToast("Transaction Logged! 💸"); }
+
+    saveData(); updateUI(); toggleAddSheet(false); switchTab('home'); 
+}
+
+function deleteExpense(id, event) { event.stopPropagation(); data.expenses = data.expenses.filter(e => e.id !== id); saveData(); updateUI(); }
+
+function settleUp() {
+    let balance = calculateOverallPartnerBalance();
+    if(balance === 0) return showToast("You are already settled up!");
+    let isTheyOweMe = balance > 0;
+    let msg = isTheyOweMe ? `Did ${data.partnerName} pay you ₹${balance}?` : `Did you pay ${data.partnerName} ₹${Math.abs(balance)}?`;
+    
+    if(confirm(msg)) {
+        let now = new Date();
+        data.expenses.push({
+            id: Date.now(), amount: Math.abs(balance), category: "Settlement", note: "Settled Up 🤝", 
+            shared: true, isSettlement: true, paidBy: isTheyOweMe ? 'partner' : 'me', 
+            date: now.toISOString().split("T")[0], time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        });
+        saveData(); updateUI(); showToast("All Debts Settled! 🎉");
+    }
+}
+
+// --- RENDERING UI ---
+function updateUI() {
+    let monthDate = new Date(getActiveMonth() + "-01");
+    document.getElementById('displayMonthName').innerText = monthDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+
+    const totalExp = getTotalExpenses(); const totalSavedInBuckets = getTotalSaved(); 
+    const leftoverMoney = data.income - getWalletDeductions(); const currentBalance = getBalance(); 
+    
+    const remainingGoalToHit = Math.max(0, data.monthlySavingGoal - totalSavedInBuckets);
+    const safeToSpend = currentBalance - remainingGoalToHit; 
+    const goalPerc = data.monthlySavingGoal > 0 ? Math.min((totalSavedInBuckets / data.monthlySavingGoal) * 100, 100) : 0;
+
+    document.getElementById("totalIncome").innerText = data.income.toLocaleString(); 
+    document.getElementById("totalExpense").innerText = totalExp.toLocaleString(); 
+    document.getElementById("balance").innerText = currentBalance.toLocaleString(); 
+    document.getElementById("displayGoal").innerText = data.monthlySavingGoal.toLocaleString(); 
+    document.getElementById("totalLockedTop").innerText = totalSavedInBuckets.toLocaleString();
+    document.getElementById("goalProgress").style.width = `${Math.max(0, goalPerc)}%`; 
+    document.getElementById("leftoverMoney").innerText = `₹${leftoverMoney.toLocaleString()}`;
+    
+    const safeEl = document.getElementById("safeToSpend"); safeEl.innerText = `₹${safeToSpend.toLocaleString()}`; safeEl.style.color = safeToSpend < 0 ? "#ef4444" : "#10b981"; 
+
+    let partnerBal = calculateOverallPartnerBalance();
+    let pStatus = document.getElementById("partnerStatusText"); let pAmount = document.getElementById("partnerBalanceAmount");
+    let pCard = document.getElementById("partnerBalanceCard"); let settleBtn = document.getElementById("settleUpBtn");
+
+    if (partnerBal > 0) {
+        pStatus.innerText = `${data.partnerName} owes you`; pAmount.innerText = `₹${partnerBal}`; 
+        pAmount.className = "text-5xl font-extrabold tracking-tight mb-4 text-emerald-500"; pCard.className = "glass-card p-8 rounded-[2.5rem] text-center border-emerald-500/30 flex flex-col items-center justify-center";
+        settleBtn.style.display = "block"; settleBtn.innerText = "Mark as Paid";
+    } else if (partnerBal < 0) {
+        pStatus.innerText = `You owe ${data.partnerName}`; pAmount.innerText = `₹${Math.abs(partnerBal)}`; 
+        pAmount.className = "text-5xl font-extrabold tracking-tight mb-4 text-red-500"; pCard.className = "glass-card p-8 rounded-[2.5rem] text-center border-red-500/30 flex flex-col items-center justify-center";
+        settleBtn.style.display = "block"; settleBtn.innerText = "Pay Them Back";
+    } else {
+        pStatus.innerText = `All Settled Up`; pAmount.innerText = `₹0`; 
+        pAmount.className = "text-5xl font-extrabold tracking-tight mb-4 opacity-50"; pCard.className = "glass-card p-8 rounded-[2.5rem] text-center border-white/10 flex flex-col items-center justify-center";
+        settleBtn.style.display = "none";
+    }
+
+    let selects = ["category", "subCategory"];
+    selects.forEach(id => { let el = document.getElementById(id); if(!el) return; el.innerHTML = ""; data.categories.forEach(c => { el.innerHTML += `<option value="${c}">${c}</option>`; }); });
+
+    renderBuckets(); renderDatabase(); renderSubs(); updateGamification();
+}
+
+function renderDatabase() { 
+    let q = document.getElementById("searchInput") ? document.getElementById("searchInput").value.toLowerCase() : ""; 
+    let f = getFilteredExpenses().filter(e => e.category.toLowerCase().includes(q) || (e.note && e.note.toLowerCase().includes(q))); 
+    
+    let list = document.getElementById("expenseList"); if(list) list.innerHTML = ""; 
+    let pList = document.getElementById("sharedExpenseList"); if(pList) pList.innerHTML = "";
+
+    [...data.expenses].reverse().forEach(e => { 
+        let displayAmt = e.isSettlement ? e.amount : (e.shared ? e.amount/2 : e.amount);
+        let icon = e.isSettlement ? "🤝" : (e.shared ? (e.paidBy === 'me' ? "↗️" : "↙️") : "👤");
+        let noteExtra = e.shared && !e.isSettlement ? ` (Total: ₹${e.amount})` : "";
+        let color = e.isSettlement ? "text-emerald-500" : (e.shared && e.paidBy === 'partner' ? "text-orange-500" : "text-red-500");
+        let prefix = e.isSettlement ? "+" : "-";
+
+        let li = `
+        <li class="glass-card p-4 rounded-2xl flex justify-between items-center cursor-pointer hover:bg-white/5 transition-all mb-3" onclick="toggleAddSheet(true, ${e.id})">
+            <div>
+                <p class="font-bold text-sm">${icon} ${e.category}</p>
+                <p class="text-[10px] opacity-60 mt-0.5">${e.note||''}${noteExtra} • ${e.date}</p>
+            </div>
+            <div class="flex items-center gap-3 text-right">
+                <p class="font-bold ${color}">${prefix}₹${displayAmt}</p>
+                <button onclick="deleteExpense(${e.id}, event)" class="bg-red-500/20 text-red-500 rounded-full w-6 h-6 text-xs flex items-center justify-center transition-colors">✕</button>
+            </div>
+        </li>`; 
+        
+        if (e.date.startsWith(getActiveMonth()) && list) list.innerHTML += li;
+        if (e.shared && pList) pList.innerHTML += li;
+    }); 
+}
+
+function renderBuckets() {
+    let c = document.getElementById("bucketsContainer"); c.innerHTML = "";
+    data.buckets.forEach(b => {
+        let p = Math.min((b.saved / b.target) * 100, 100); let clr = p === 100 ? 'bg-emerald-500' : 'bg-blue-500';
+        c.innerHTML += `
+        <div class="bg-black/10 p-4 rounded-2xl border border-white/5">
+            <div class="flex justify-between items-end mb-1">
+                <div><p class="font-bold text-sm">${b.name}</p><p class="text-[10px] opacity-60">₹${b.saved} / ₹${b.target}</p></div>
+                <button onclick="allocateFunds(${b.id})" class="text-xs bg-white/10 px-3 py-1 rounded-full font-bold">+ Fund</button>
+            </div>
+            <div class="relative w-full bg-black/20 h-2 rounded-full mt-3 mb-1">
+                <div class="absolute top-0 left-0 h-full ${clr} transition-all duration-1000 rounded-full" style="width: ${p}%"></div>
+                <div class="absolute top-1/2 -translate-y-1/2 transition-all duration-1000 text-[12px] z-10" style="left: calc(${p}% - 8px)">${p===100?'✅':'🏃'}</div>
+            </div>
+        </div>`;
+    });
+}
+
+function renderChart() { 
+    if(!document.getElementById('expenseChart')) return; 
+    const ctx = document.getElementById('expenseChart').getContext('2d'); 
+    const categoryTotals = {}; getFilteredExpenses().forEach(e => { if(!e.isSettlement) categoryTotals[e.category] = (categoryTotals[e.category] || 0) + getMyExpenseShare(e); }); 
+    let colors = data.theme === 'warm' ? ['#d97706', '#b45309', '#78350f', '#fbbf24'] : (data.theme === 'latte' ? ['#8B5A2B', '#A0522D', '#CD853F', '#DEB887'] : ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd']);
+    if (chartInstance) chartInstance.destroy(); 
+    chartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(categoryTotals), datasets: [{ data: Object.values(categoryTotals), backgroundColor: colors, borderWidth: 0 }] }, options: { plugins: { legend: { position: 'bottom', labels: { color: data.theme === 'dark' ? '#f1f5f9' : '#334155' } } }, cutout: '70%' } }); 
+}
+
+function updateGamification() {
+    let dates = [...new Set(data.expenses.map(e => e.date))].sort().reverse(); let streak = 0; let checkDate = new Date();
+    for (let i = 0; i < 30; i++) { let dateStr = checkDate.toISOString().split("T")[0]; if (!dates.includes(dateStr)) { streak++; } else { break; } checkDate.setDate(checkDate.getDate() - 1); }
+    document.getElementById("streakDays").innerText = streak;
+}
+
+// RESTORED: SUBSCRIPTIONS & EV CALC FUNCTIONS
+function checkSubscriptions() {
+    let today = new Date(); let currentMonth = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`; let currentDay = today.getDate(); let updated = false;
+    data.subscriptions.forEach(sub => {
+        if (currentDay >= sub.cycleDate && sub.lastPaidMonth !== currentMonth) {
+            data.expenses.push({ id: Date.now() + Math.random(), amount: sub.amount, category: sub.category, note: `🤖 Auto-Paid: ${sub.name}`, shared: false, paidBy: 'me', isSettlement: false, date: `${currentMonth}-${sub.cycleDate.toString().padStart(2, '0')}`, time: today.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
+            sub.lastPaidMonth = currentMonth; updated = true; showToast(`🤖 Auto-paid ${sub.name}!`);
+        }
+    });
+    if(updated) { saveData(); updateUI(); }
+}
+function addSubscription() { let name = document.getElementById("subName").value.trim(); let amount = Number(document.getElementById("subAmount").value); let category = document.getElementById("subCategory").value; let cycleDate = Number(document.getElementById("subDate").value); if(!name || amount <= 0 || cycleDate < 1 || cycleDate > 31) return showToast("Invalid Subscription Data", true); data.subscriptions.push({ id: Date.now(), name, amount, category, cycleDate, lastPaidMonth: "" }); saveData(); updateUI(); document.getElementById("subName").value = ""; document.getElementById("subAmount").value = ""; document.getElementById("subDate").value = ""; showToast("Subscription Active!"); }
+function deleteSubscription(id) { data.subscriptions = data.subscriptions.filter(s => s.id !== id); saveData(); updateUI(); showToast("Subscription Removed"); }
+function renderSubs() { let list = document.getElementById("subsList"); if(!list) return; list.innerHTML = ""; data.subscriptions.forEach(s => { list.innerHTML += `<div class="flex justify-between items-center bg-black/20 p-2 rounded-lg"><span>${s.name} (Day ${s.cycleDate})</span><div class="flex items-center gap-2"><span class="text-indigo-400 font-bold">₹${s.amount}</span><button onclick="deleteSubscription(${s.id})" class="text-red-500 bg-red-500/20 px-2 rounded-full">✕</button></div></div>`; }); }
+
+let currentEvShare = 0;
+function calculateEV() { let d=Number(document.getElementById("evDistance").value), dy=Number(document.getElementById("evDays").value), r=Number(document.getElementById("evRange").value), rt=Number(document.getElementById("evRate").value), p=Number(document.getElementById("evParking").value), ppl=Number(document.getElementById("evPeople").value); if(d<=0||dy<=0||r<=0||ppl<=0) return; currentEvShare = Math.round((((d*dy)/r)*rt + p)/ppl); document.getElementById("evResultArea").classList.remove("hidden"); document.getElementById("evFinalShare").innerText = currentEvShare; }
+function saveEVExpense() { if(currentEvShare<=0) return; let now = new Date(); if(!data.categories.includes("Travel")) data.categories.push("Travel"); data.expenses.push({ id: Date.now(), amount: currentEvShare, category: "Travel", note: "Monthly EV Commute", shared: false, paidBy: 'me', isSettlement: false, date: now.toISOString().split("T")[0], time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }); saveData(); updateUI(); showToast("Logged to Travel!"); document.getElementById("evResultArea").classList.add("hidden"); currentEvShare=0; switchTab('home'); }
+
+// OTHER ACTIONS
+function exportData() { let csvContent = "data:text/csv;charset=utf-8,ID,Date,Category,Note,Total Amount,Your Expense Share,Wallet Impact,Shared,Paid By,Is Settlement\n"; data.expenses.forEach(e => { let row = `${e.id},${e.date},${e.category},"${e.note || ''}",${e.amount},${getMyExpenseShare(e)},${getWalletImpact(e)},${e.shared},${e.paidBy},${e.isSettlement}`; csvContent += row + "\n"; }); const dl = document.createElement('a'); dl.setAttribute("href", encodeURI(csvContent)); dl.setAttribute("download", `ExpensePro_Export_${Date.now()}.csv`); dl.click(); showToast("Exported to CSV!"); }
+function addIncome() { let v = Number(document.getElementById("incomeInput").value); if(v>0){ data.income+=v; saveData(); updateUI(); document.getElementById("incomeInput").value=""; showToast("Income Added!"); } }
+function setPocketMoney() { let v = Number(document.getElementById("pocketInput").value); if(v>=0){ data.pocketMoney=v; saveData(); updateUI(); document.getElementById("pocketInput").value=""; showToast("Pocket Money Set!"); } }
+function setSavingGoal() { let v = Number(document.getElementById("goalInput").value); if(v >= 0) { data.monthlySavingGoal = v; saveData(); updateUI(); document.getElementById("goalInput").value = ""; showToast("Goal Updated!"); } }
+function savePartnerName() { let n = document.getElementById("partnerNameInput").value; if(n){ data.partnerName = n; saveData(); updateUI(); showToast("Partner Saved!"); } }
+function addCategory() { let c = document.getElementById("newCategory").value.trim(); if(c && !data.categories.includes(c)) { data.categories.push(c); saveData(); updateUI(); document.getElementById("newCategory").value = ""; showToast("Category Added!"); } }
+function deleteCategory() { let cat = prompt("Category to delete?"); if(cat && data.categories.includes(cat)) { data.expenses.forEach(e => { if(e.category === cat) e.category = "Other"; }); data.categories = data.categories.filter(c => c !== cat); saveData(); updateUI(); } }
+function createNewBucket() { let n = prompt("Bucket name:"); let t = Number(prompt("Target (₹):")); if(n && t>0) { data.buckets.push({ id: Date.now(), name: n, target: t, saved: 0 }); saveData(); updateUI(); } }
+function allocateFunds(id) { let b = data.buckets.find(x => x.id === id); let a = Number(prompt(`Move to ${b.name}?`)); if(a>0 && a<=(data.income - getWalletDeductions())) { b.saved += a; saveData(); updateUI(); if(b.saved >= b.target) confetti({particleCount: 150, origin: { y: 0.6 }}); } }
+function showToast(msg, isWarning = false) { let t = document.createElement("div"); t.innerText = msg; t.className = `fixed bottom-32 left-1/2 -translate-x-1/2 ${isWarning ? 'bg-red-600' : 'bg-slate-800'} text-white px-6 py-3 rounded-full text-xs font-bold z-[9999] shadow-2xl transition-opacity duration-300`; document.body.appendChild(t); setTimeout(() => { t.style.opacity = "0"; setTimeout(()=>t.remove(), 300); }, 2000); }
+function resetData() { if(confirm("Nuke data?")) { localStorage.clear(); location.reload(); } }
+function filterDatabase() { renderDatabase(); }
+
+checkSubscriptions();
+updateUI(); switchTab('home'); 
+</script>
+</body>
+</html>
