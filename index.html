@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="manifest.json">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    
     <meta charset="UTF-8">
     <title>Expense Tracker Pro</title>
     
@@ -293,13 +297,8 @@
 <script>
 // --- INLINE SERVICE WORKER FOR PWA ---
 if ('serviceWorker' in navigator) {
-    const swCode = `
-        self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
-        self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-        self.addEventListener('fetch', e => { e.respondWith(fetch(e.request).catch(() => new Response('Offline mode active'))); });
-    `;
-    const blob = new Blob([swCode], {type: 'application/javascript'});
-    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(console.error);
+    navigator.serviceWorker.register('sw.js')
+        .then(() => console.log("Service Worker Registered"));
 }
 
 // --- DATA INITIALIZATION ---
@@ -619,6 +618,7 @@ function filterDatabase() { renderDatabase(); }
 
 checkSubscriptions();
 updateUI(); switchTab('home'); 
+    
 </script>
 </body>
 </html>
