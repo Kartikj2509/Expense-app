@@ -63,22 +63,30 @@ html, body {
 
 /* Add padding for the notch and home bar */
 header {
-    padding-top: env(safe-area-inset-top);
+    /* Pushes the "Hey 👋" down below the notch */
+    padding-top: calc(1rem + env(safe-area-inset-top));
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 nav {
+    /* Lifts the nav bar above the iPhone home swipe bar */
     bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
+    left: 1.5rem !important;
+    right: 1.5rem !important;
+    width: auto !important; /* Prevents it from stretching weirdly */
 }
 
 section {
-    padding-bottom: calc(120px + env(safe-area-inset-bottom)) !important;
+    /* Ensures you can scroll all the way to the bottom without the nav covering it */
+    padding-bottom: calc(140px + env(safe-area-inset-bottom)) !important;
 }
     </style>
 </head>
 
 <body class="min-h-screen flex items-center justify-center p-4">
 
-<div class="w-full sm:max-w-md h-screen sm:h-[90vh] flex flex-col relative overflow-hidden sm:shadow-2xl sm:rounded-[3rem] sm:border sm:border-white/10" style="background-color: var(--bg-color);">
+<div class="w-full min-h-screen sm:max-w-md sm:h-[95vh] sm:my-4 mx-auto flex flex-col relative overflow-hidden sm:rounded-[3rem] sm:border sm:border-white/10 shadow-2xl" style="background-color: var(--bg-color);">
 
     <header class="p-8 pb-2 flex justify-between items-center z-50 backdrop-blur-md pt-[env(safe-area-inset-top)]">
         <div>
