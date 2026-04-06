@@ -82,7 +82,9 @@ section {
     /* Extra padding at the bottom so you can scroll past the nav bar */
     padding-bottom: calc(130px + env(safe-area-inset-bottom)) !important;
 }
-
+.pt-safe {
+    padding-top: calc(env(safe-area-inset-top) + 12px);
+}
     </style>
 </head>
 
@@ -92,7 +94,7 @@ section {
 <div class="w-full sm:max-w-md min-h-screen sm:h-[92vh] flex flex-col relative overflow-hidden sm:shadow-2xl sm:rounded-[3rem] sm:border sm:border-white/10 mx-auto" style="background-color: var(--bg-color);">
 
 
-    <header class="p-8 pb-2 flex justify-between items-center z-50 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+    <header class="px-6 pb-2 pt-safe flex justify-between items-center z-50 backdrop-blur-md">
         <div>
             <p id="greeting" class="text-2xl font-bold">Hey 👋</p>
             <input type="month" id="monthSelector" onchange="changeMonth()" class="bg-transparent text-[12px] uppercase tracking-widest text-blue-500 font-bold outline-none cursor-pointer mt-1 border-none appearance-none">
