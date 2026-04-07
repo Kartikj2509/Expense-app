@@ -1,23 +1,19 @@
-const CACHE_NAME = 'expense-pro-v1';
-const ASSETS = [
-    'index.html',
-    'manifest.json',
-    'icons/icon-192x192.png',
-    'icons/icon-512x512.png'
-];
-
-// Install: Cache essential files
+// sw.js
 self.addEventListener('install', (e) => {
-    e.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-    );
+    console.log('[Service Worker] Installed');
+    self.skipWaiting();
 });
 
-// Fetch: Serve from cache, then update from network
+self.addEventListener('activate', (e) => {
+    console.log('[Service Worker] Activated');
+    return self.clients.claim();
+});
+
+// THIS is the magic line Android requires to show the Install prompt!
 self.addEventListener('fetch', (e) => {
     e.respondWith(
-        caches.match(e.request).then((response) => {
-            return response || fetch(e.request);
+        fetch(e.request).catch(() => {
+            console.log('App is offline. Advanced offline caching can be added later.');
         })
     );
 });
